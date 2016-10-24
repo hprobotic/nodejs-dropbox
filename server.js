@@ -1,5 +1,4 @@
-#!/usr/bin/env babel-node
-
+#!/usr/bin/env nodemon  --exec babel-node
 
 let fs = require('fs')
 let path = require('path')
@@ -56,13 +55,15 @@ app.head('*', setTransMetaData, setTransHeaders, (req, res, next) => {
 
 // PUT
 app.put('*', setTransMetaData, setDirectoryDetail, (req, res, next) => {
-
     (async () => {
-        console.log(`put somthing in here`)
         if (req.stat) return res.status(405).send('Method Not Allowed');
-        await mkdirp.promise(req.dirPath)
+
         if(!req.isDir) {
             req.pipe(fs.createWriteStream(req.filePath))
+            res.status(200).send(`File is created`)
+        } else {
+            await mkdirp.promise(req.dirPath)
+            res.status(200).send(`Directory is created`)
         }
         res.end()
     })().catch(next)
@@ -142,8 +143,7 @@ function setTransMetaData(req, res, next) {
 function setTransHeaders(req, res, next) {
     nodeify((async ()=> {
         let filePath = req.filePath
-        console.log(`File path: ${filePath}`)
-        const stat = await fs.stat(filePath)
+        const stat = req.stat
         if (stat.isDirectory()) {
             let files = await fs.promise.readdir(filePath)
             res.body = JSON.stringify(files)
@@ -152,7 +152,7 @@ function setTransHeaders(req, res, next) {
             return
         } else {
             res.setHeader('Content-Length', stat.size)
-            res.setHeader('Content-Type', mime.contentType(path.extname(path)))
+            res.setHeader('Content-Type', mime.contentType(path.extname(filePath)))
         }
     })(), next)
 
