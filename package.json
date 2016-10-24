@@ -5,6 +5,7 @@
   "main": "server.js",
   "scripts": {
     "start": "nodemon  --exec 'babel-node -- ./' -- ",
+    "client": "nodemon  --exec 'babel-node -- client.js",
     "once": "babel-node -- ./",
     "test": "mocha --compilers js:babel-register test/spec",
     "dev": "run-p start watch:test watch:lint",
@@ -13,6 +14,10 @@
     "build": "babel ./ -o dist",
     "watch:test": "nodemon --exec \"npm test || true\"",
     "watch:lint": "nodemon --exec \"npm run lint || true\""
+  },
+  "bin": {
+    "cli-client": "./client.js",
+    "cli-server": "./server.js"
   },
   "repository": {
     "type": "git",

@@ -21,7 +21,7 @@ require('songbird')
 const NODE_ENV = process.env.NODE_ENV
 const PORT = process.env.PORT || 8000
 const ROOT_DIR = argv.dir ? path.resolve(argv.dir) : path.resolve(process.cwd())
-const SOCKET_PORT = 4000
+const SOCKET_PORT = 8001
 
 let app = express()
 
@@ -131,9 +131,8 @@ function setResponseHeaders(req, res, next) {
             return
         } else {
             res.setHeader('Content-Length', stat.size)
-            res.setHeader('Content-Type', mime.contentType(path.extname(path)))
+            // res.setHeader('Content-Type', mime.contentType(path.extname(path)))
         }
-
     })(), next)
 
 }
