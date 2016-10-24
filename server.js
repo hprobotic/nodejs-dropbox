@@ -38,7 +38,7 @@ app.all('*', function (req, res, next) {
     next() // pass control to the next handler
 });
 // GET
-app.get('*', setResponseMetaData, setResponseHeaders, (req, res) => {
+app.get('*', setTransMetaData, setTransHeaders, (req, res) => {
     if(res.body) {
         res.json(res.body)
         return
@@ -50,12 +50,12 @@ app.get('*', setResponseMetaData, setResponseHeaders, (req, res) => {
 })
 
 // HEAD
-app.head('*', setResponseMetaData, setResponseHeaders, (req, res, next) => {
+app.head('*', setTransMetaData, setTransHeaders, (req, res, next) => {
     res.end()
 })
 
 // PUT
-app.put('*', setResponseMetaData, setDirectoryDetail, (req, res, next) => {
+app.put('*', setTransMetaData, setDirectoryDetail, (req, res, next) => {
 
     (async () => {
         console.log(`put somthing in here`)
@@ -69,7 +69,7 @@ app.put('*', setResponseMetaData, setDirectoryDetail, (req, res, next) => {
 })
 
 // POST
-app.post('*', setResponseMetaData, setDirectoryDetail, (req, res, next) => {
+app.post('*', setTransMetaData, setDirectoryDetail, (req, res, next) => {
     (async() => {
         const stat = await fs.stat(req.filePath)
         // let isDirectory = req.isDirectory()
@@ -87,7 +87,7 @@ app.post('*', setResponseMetaData, setDirectoryDetail, (req, res, next) => {
 })
 
 // DELETE
-app.delete('*', setResponseMetaData, (req, res, next) => {
+app.delete('*', setTransMetaData, (req, res, next) => {
     (async() => {
         let stat = req.stat
         // Check request
@@ -120,7 +120,7 @@ function setDirectoryDetail(req, res, next) {
     next()
 }
 
-function setResponseMetaData(req, res, next) {
+function setTransMetaData(req, res, next) {
     // nodeify((async()=> {
     //     req.filePath = path.resolve(path.join(ROOT_DIR, req.url))
     //     let filePath = req.filePath
@@ -131,11 +131,15 @@ function setResponseMetaData(req, res, next) {
     req.filePath = path.resolve(path.join(ROOT_DIR, req.url))
     let filePath = req.filePath
     console.log(`set response: ${filePath}`)
-    fs.promise.stat(filePath).then(stat => req.stat = stat, () => req.stat = null)
+    fs.promise.stat(filePath)
+        .then(
+            stat => req.stat = stat,
+            () => req.stat = null
+        )
         .nodeify(next)
 }
 
-function setResponseHeaders(req, res, next) {
+function setTransHeaders(req, res, next) {
     nodeify((async ()=> {
         let filePath = req.filePath
         console.log(`File path: ${filePath}`)
@@ -158,7 +162,7 @@ function setResponseHeaders(req, res, next) {
 var socketServer = net.createServer()
 socketServer.listen(SOCKET_PORT)
 socketServer.on('connection', function (socket) {
-    async ()=>{
+    (async ()=>{
         socket = new jsonSocket(socket)
         let watcher = chokidar.watch('.', {ignored: /[\/\\]\./, ignoreInitial: true})
         let content = ""
@@ -168,7 +172,7 @@ socketServer.on('connection', function (socket) {
 
         watcher.on('all', (event, path, stat) => {
             filePathClient = path
-            console.log("Event: " + event + " Path: " + path)
+            console.log(`${Date.now()}: Just ${event} at ${path}`)
             if (event === 'change') {
                 action = 'update'
                 type = 'file'
@@ -194,7 +198,7 @@ socketServer.on('connection', function (socket) {
                 "updated": Date.now()
             })
         })
-    }
+    })()
 })
 
 

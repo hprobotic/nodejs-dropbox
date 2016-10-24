@@ -1,4 +1,4 @@
-#!/usr/bin/env babel-node
+#!/usr/bin/env nodemon  --exec babel-node
 
 let fs = require('fs')
 let path = require('path')
@@ -30,18 +30,34 @@ socket.on('connect', function () {
 
             if (action === 'create') {
                 await mkdirp.promise(dirPath)
+                if (!isDir) {
+                    await  fs.promise.writeFile(filePath, json.contents)
+                        .then(
+                            console.log(`File created: ${filePath}`)
+                        ).catch()
+                    return
+                }
+            } else if (action === 'delete') {
                 if(!isDir) {
                     console.log(filePath)
-                    await rimraf.promise(filePath).then(console.log(`Directory is deleted`)).catch(console.log(`Catched`))
+                    await rimraf.promise(filePath)
+                        .then(
+                            console.log(`Directory is deleted`)
+                        )
+                        .catch()
                     return
                 } else {
-                    await rimraf.promise.unlink(filePath).then(console.log(`File is deleted`)).catch(console.log(`Catched`))
+                    await fs.promise.unlink(filePath)
+                        .then(
+                            console.log(`File is deleted`)
+                        )
+                        .catch()
                 }
                 return
             } else if(action === 'update') {
                 await fs.promise.truncate((filePath, 0))
                 await fs.promise.writeFile(filePath, json.contents).then(console.log(`File updated: ${filePath}`))
             }
-        })().catch(console.log(`Catched`))
+        })().catch(console.log(``))
     })
 })
