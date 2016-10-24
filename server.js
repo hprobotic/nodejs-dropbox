@@ -20,7 +20,7 @@ require('songbird')
 
 const NODE_ENV = process.env.NODE_ENV
 const PORT = process.env.PORT || 8000
-const ROOT_DIR = path.resolve(process.cwd())
+const ROOT_DIR = argv.dir ? path.resolve(argv.dir) : path.resolve(process.cwd())
 const SOCKET_PORT = 4000
 
 let app = express()
@@ -30,7 +30,7 @@ if(NODE_ENV == 'development') {
 }
 
 app.listen(PORT, ()=> console.log(`LSNING @ http://127.0.0.1:${PORT}`))
-
+console.log(`Root Directory is: ${ROOT_DIR}`)
 // GET
 app.get('*', setResponseMetaData, setResponseHeaders, (req, res) => {
     if(res.body) {
@@ -43,10 +43,12 @@ app.get('*', setResponseMetaData, setResponseHeaders, (req, res) => {
     }
 })
 
+// HEAD
 app.head('*', setResponseMetaData, setResponseHeaders, (req, res, next) => {
     res.end()
 })
 
+// PUT
 app.put('*', setResponseMetaData, setDirectoryDetail, (req, res, next) => {
     (async () => {
         if (req.stat) return res.status(405).send('Method Not Allowed');
@@ -58,12 +60,41 @@ app.put('*', setResponseMetaData, setDirectoryDetail, (req, res, next) => {
     })().catch(next)
 })
 
-app.post('*', (req, res, next) => {
-    res.end()
+// POST
+app.post('*', setResponseMetaData, setDirectoryDetail, (req, res, next) => {
+    (async() => {
+        let stat = req.stat
+        let isDirectory = req.isDirectory
+        if(!stat) {
+            return res.send(405, 'File not found')
+        }
+        if(isDirectory) {
+            return res.send(405, 'Path is directory')
+        }
+
+        await  fs.promise.truncate(req.filePath)
+        res.end()
+    })().catch(next)
 })
 
+// DELETE
 app.delete('*', (req, res, next) => {
+    (async() => {
+        let stat = req.stat
+        let isDirectory = stat.isDirectory
 
+        // Check request
+        if(!stat) {
+            return res.send(400, 'Invalid path')
+        }
+        if(isDirectory) {
+            return res.send(405, 'Path is Directory')
+        }
+
+        await fs.promise.truncate(req.filePath, 0)
+        req.pipe(fs.createWriteStream(req.filePath))
+        res.end()
+    })().catch(next)
 })
 
 
@@ -87,7 +118,7 @@ function setResponseMetaData(req, res, next) {
 }
 
 function setResponseHeaders(req, res, next) {
-    nodeify(async ()=> {
+    nodeify((async ()=> {
         let filePath = req.filePath
         console.log(`File path: ${filePath}`)
 
@@ -103,7 +134,7 @@ function setResponseHeaders(req, res, next) {
             res.setHeader('Content-Type', mime.contentType(path.extname(path)))
         }
 
-    }, next)
+    })(), next)
 
 }
 
