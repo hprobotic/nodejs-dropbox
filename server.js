@@ -95,13 +95,15 @@ app.delete('*', setResponseMetaData, (req, res, next) => {
             return res.status(400).send('Invalid path')
         }
         if(stat.isDirectory()) {
-            await rimraf.promise(req.filePath).then(res.status(200).send(`Directory is Deleted`)).catch(console.log(`Catched`))
+            await rimraf.promise(req.filePath)
+                .then(
+                    res.status(200).send(`Directory is Deleted`)
+                ).catch(
+                    console.log(`Catched`)
+                )
         } else  {
-            await rimraf.promise.unlink(req.filePath)
+            await fs.unlink(req.filePath)
         }
-
-        await fs.promise.truncate(req.filePath, 0)
-        req.pipe(fs.createWriteStream(req.filePath))
         res.end()
     })().catch(next)
 })
