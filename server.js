@@ -1,14 +1,27 @@
+#!/usr/bin/env babel-node
+
+
 let fs = require('fs')
 let path = require('path')
 let express = require('express')
 let morgan = require('morgan')
 let nodeify = require('bluebird-nodeify')
+let chokidar = require('chokidar')
+let mime = require('mime-types')
+let rimraf = require('rimraf')
+let mkdirp = require('mkdirp')
+let bluebird = require('bluebird')
+let argv = require('yargs').argv
+let net = require('net')
+let jsonSocket = require('json-socket')
 
+// App config
 require('songbird')
 
 const NODE_ENV = process.env.NODE_ENV
 const PORT = process.env.PORT || 8000
 const ROOT_DIR = path.resolve(process.cwd())
+const SOCKET_PORT = 4000
 
 let app = express()
 
@@ -19,7 +32,7 @@ if(NODE_ENV == 'development') {
 app.listen(PORT, ()=> console.log(`LSNING @ http://127.0.0.1:${PORT}`))
 
 // GET
-app.get('*', setResponseHeaders, setResponseMetaData, (req, res, next) => {
+app.get('*', setResponseMetaData, setResponseHeaders, (req, res) => {
     if(res.body) {
         res.json(res.body)
         return
@@ -30,12 +43,19 @@ app.get('*', setResponseHeaders, setResponseMetaData, (req, res, next) => {
     }
 })
 
-app.head('*', (req, res, next) => {
+app.head('*', setResponseMetaData, setResponseHeaders, (req, res, next) => {
     res.end()
 })
 
-app.put('*', (req, res, next) => {
-    res.end()
+app.put('*', setResponseMetaData, setDirectoryDetail, (req, res, next) => {
+    (async () => {
+        if (req.stat) return res.status(405).send('Method Not Allowed');
+        await mkdirp.promise(req.dirPath)
+        if(!req.isDir) {
+            req.pipe(fs.createWriteStream(req.filePath))
+        }
+        res.end()
+    })().catch(next)
 })
 
 app.post('*', (req, res, next) => {
@@ -48,15 +68,22 @@ app.delete('*', (req, res, next) => {
 
 
 // Extend request and response data
+function setDirectoryDetail(req, res, next) {
+    let filePath = req.filePath
+    let isEndWithSlash = filePath.charAt(filePath.length-1) === path.sep
+    let isHasExt = path.extname(filePath) !== ''
+    req.isDir = isEndWithSlash || !isHasExt
+    req.dirPath = req.isDir ? filePath : path.dirname(filePath)
+    next()
+}
 
 function setResponseMetaData(req, res, next) {
     req.filePath = path.resolve(path.join(ROOT_DIR, req.url))
     let filePath = req.filePath
-    fs.promise.stat(filePath)
-        .then(
-        stat => req.stat = stat, () => req.stat = null
-        ).nodeify(next)
 
+    fs.promise.stat(filePath)
+        .then(stat => req.stat = stat)
+        .nodeify(next)
 }
 
 function setResponseHeaders(req, res, next) {
@@ -80,6 +107,48 @@ function setResponseHeaders(req, res, next) {
 
 }
 
+// TCP
+var socketServer = net.createServer()
+socketServer.listen(SOCKET_PORT)
+socketServer.on('connection', function (socket) {
+    async ()=>{
+        socket = new jsonSocket(socket)
+        let watcher = chokidar.watch('.', {ignored: /[\/\\]\./, ignoreInitial: true})
+        let content = ""
+        let type = null
+        let action = ""
+        let filePathClient = ""
+
+        watcher.on('all', (event, path, stat) => {
+            filePathClient = path
+            console.log("Event: " + event + " Path: " + path)
+            if (event === 'change') {
+                action = 'update'
+                type = 'file'
+                content = fs.readFileSync(path, 'utf8')
+            }
+            if (event === 'add' || event === 'addDir') {
+                let isDirectory = event === 'addDir'
+                action = 'create'
+                content = isDirectory ? null : fs.readFileSync(path, 'utf8')
+                type = isDirectory ? 'dir' : 'file'
+            }
+            if (event === 'unlinkDir' || event === 'unlinkDir') {
+                action == 'delete'
+                content = null
+                type = event === 'unlinkDir' ? 'dir' : 'file'
+            }
+
+            socket.sendMessage({
+                "action": action,
+                "path": filePathClient,
+                "type": type,
+                "contents": content,
+                "updated": Date.now()
+            })
+        })
+    }
+})
 
 
 
